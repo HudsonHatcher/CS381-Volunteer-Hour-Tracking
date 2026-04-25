@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install --no-cache-dir
+EXPOSE 5003
 
-CMD ["python", "ui_service.py"]
+RUN pip install flask
+
+CMD ["python", "DashboardService.py"]

@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY . .
 
-RUN pip install --no-cache-dir
+EXPOSE 5001
 
-CMD ["python", "db_service.py"]
+# RUN pip install 
+
+CMD ["python", "proofOfConcept.py"]
