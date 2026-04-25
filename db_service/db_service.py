@@ -63,6 +63,3 @@ def handle_client(client):
     finally:
         client.close()
 
-
-if __name__ == "__main__":
-    start_server()
