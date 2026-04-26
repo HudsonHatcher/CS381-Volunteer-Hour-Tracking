@@ -6,8 +6,9 @@ services:
     container_name: db_service
     ports:
       - "5001:5001"
+    tty: true
     volumes:
-      - db_data:/app
+      - db_data:/app/data
     networks:
       - app_network
 
@@ -16,6 +17,7 @@ services:
     container_name: email_service
     ports:
       - "5002:5002"
+    tty: true
     depends_on:
       - db_service
     networks:
@@ -26,14 +28,15 @@ services:
     container_name: ui_service
     stdin_open: true
     tty: true
+    ports:
+      - "5000:5000"
     depends_on:
       - db_service
-      - email_service
     networks:
       - app_network
 
-volumes:
-  db_data:
-
 networks:
   app_network:
+
+volumes:
+  db_data:
