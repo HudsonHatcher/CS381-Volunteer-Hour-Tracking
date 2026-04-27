@@ -35,7 +35,8 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user TEXT,
-    hours INTEGER NOT NULL
+    hours INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending'
 )
 """)
 cursor.execute("""
@@ -102,7 +103,11 @@ def handle_client(con):
                 #Email Organization Leader
                 cursor.execute("SELECT supervisor_email FROM organizations WHERE organization=?", (org[0],))
                 email = cursor.fetchone()[0]
-                #send_json(emCon, {"email": email, "id": id})
+                emCon = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                emCon.connect(("email_service", 5002))
+
+                send_json(emCon, {"email": email, "id": id})
+                emCon.close()
                 send_json(con, {"status": "stored"})
 
                 #Add To Pending Hours

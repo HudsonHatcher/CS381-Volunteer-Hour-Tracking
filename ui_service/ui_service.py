@@ -484,6 +484,38 @@ def signReq():
             
     return render_template('index.html', panelUp='Block', con=con, id=id, stat=stat, myHello=f"Hello {usern}! How Can I Assist?")
 
+@app.route('/approve')
+def approve_page():
+    entry_id = request.args.get('entry_id')
+
+    return f"""
+    <h1>Approve Volunteer Hours</h1>
+    <p>Entry ID: {entry_id}</p>
+
+    <form method="POST" action="/approve_submit">
+        <input type="hidden" name="entry_id" value="{entry_id}">
+        <button name="decision" value="Y">Approve</button>
+        <button name="decision" value="N">Reject</button>
+    </form>
+    """
+
+@app.route('/approve_submit', methods=['POST'])
+def approve_submit():
+    entry_id = request.form.get('entry_id')
+    decision = request.form.get('decision')
+
+    dataStr = json.dumps({
+        "action": "update",
+        "id": int(entry_id),
+        "ver": decision,
+        "status": "approved" if decision == "Y" else "rejected"
+    })
+
+    dataClient.send(dataStr.encode())
+    data = json.loads(dataClient.recv(4096).decode())
+
+    return f"<h2>Submission {decision}</h2>"
+
 
 if __name__ == "__main__":
     #Microservice TCP Socket Creation
