@@ -4,8 +4,8 @@ WORKDIR /app
 
 COPY . .
 
-EXPOSE 5003
+EXPOSE 5000
 
 RUN pip install flask
 
-CMD ["python", "DashboardService.py"]
+ENTRYPOINT ["python", "ui_service.py"]

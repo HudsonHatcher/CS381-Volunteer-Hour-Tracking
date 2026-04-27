@@ -8,4 +8,4 @@ EXPOSE 5001
 
 # RUN pip install 
 
-CMD ["python", "proofOfConcept.py"]
+ENTRYPOINT ["python", "db_service.py"]
