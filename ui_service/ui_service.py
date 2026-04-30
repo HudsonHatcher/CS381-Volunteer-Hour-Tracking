@@ -226,6 +226,9 @@ gap: 1vw;
             </p>
             <button type="submit" style="margin-top: 5px; padding=0.5px;")">Submit</button>
         </form>
+        <form action='logOut'>
+            <button type="submit" style="margin-top: 5px; padding=0.5px;")>Sign Out</button>
+        </form>
     </div>
 <div class="wall" id="login_wall"></div>
 <div class="login" id="login_panel">
@@ -281,6 +284,42 @@ gap: 1vw;
             <button class="learn-more" type=submit>Get Info!</button>
         </form>
         <div style="padding-top: 20px;">{{ killMe | safe }}</div>
+    {% elif stat == 2 %}
+        <h1 style="text-size:24px;">{{ myHello }}</h1>
+        <div class=orgForms>
+            <div style="width: 20vw; display: flex; flex-direction: column">
+                <form action='/getMem'>
+                    <button class=learn-more style="width: 5vw; padding: 4px; font-weight: light;" type="submit">List Members<br></button>
+                    {{ myScroll | safe }}
+                </form><br><br>
+            
+                <form action='/getUser' method='GET'>
+                    <label>Get Member Information:<br></label>
+                    <input class=input style="height: 1px;" placeholder="user id | press enter for self" name="EnId"><br>
+                </form>
+                {{ killMe | safe }}
+            </div>
+
+            <div style="width: 12vw; display: flex; flex-direction: column; margin-bottom: 20px;">
+                 <form action='/changeEm' onkeydown="if(event.keyCode === 13) {alert('Please use submit button for sensitive info'); return false;}">
+                    <label>Change Administrator Email:</label>
+                    <input style='border-radius: 10px; width: 10vw; height: 20px' placeholder='Enter the new Email' name="em">
+                    <button class="btn" type="submit" style="margin-top: 5px; padding: 3px; width: 20%">Submit</button><br><br>
+                 </form>
+
+                 <form action='promoteUsr' onkeydown="if(event.keyCode === 13) {alert('Please use submit button for sensitive info'); return false;}">
+                    <label>Promote a User to Admin (Email remains):</label>
+                    <input style='border-radius: 10px; width: 10vw; height: 20px;' placeholder='User Id Please' name="promId">
+                    <button class="btn" type="submit" style="margin-top: 5px; padding: 3px; width: 20%">Submit</button>
+                 </form>
+            </div>
+       </div>
+       <form action='sUsr' class=form style="height: 15vh; width: 300px; height: 200px">
+            <p class="heading">Submit Hours for User</p>
+            <input class="input" placeholder="Enter User Id" type="text" name="uId">
+            <input class="input" placeholder="Enter the Amount of Hours" type="text" name="hour" style="margin-bottom: -30px;"> 
+            <button class="btn" type="submit">Submit</button>
+       </form>
     {% endif %}
 </div>
 </body>
@@ -340,8 +379,8 @@ def homepage():
 def getInfo():
     global id
     userid = id
-    print(userid)
     dataStr = f"{{\"action\": \"get\", \"id\": \"{userid}\"}}"
+    print(dataStr)
     dataClient.send(dataStr.encode('utf-8'))
     data = json.loads(dataClient.recv(4096).decode())
     outStr = ""
@@ -481,8 +520,155 @@ def signReq():
                     stat = 0
             global usern
             usern = user
-            
-    return render_template('index.html', panelUp='Block', con=con, id=id, stat=stat, myHello=f"Hello {usern}! How Can I Assist?")
+    print(stat)
+    return render_template('index.html', panelUp='block', con=con, id=id, stat=stat, myHello=f"Hello {usern}! How Can I Assist?")
+
+@app.route('/getUser')
+def searchU():
+    global id
+    print(request.args.get("EnId"))
+    if request.args.get("EnId"):
+        userid = int(request.args.get("EnId"))
+    else:
+        userid = id
+    dataStr = f"{{\"action\": \"get\", \"id\": \"{userid}\"}}"
+    dataClient.send(dataStr.encode('utf-8'))
+    data = json.loads(dataClient.recv(4096).decode())
+    outStr = ""
+
+    if data.get("err"):
+        print(data["err"])
+        return render_template('index.html', panelUp='block', id=id, stat=stat, myHello=f"Failed to Fetch")
+    else:
+        #Build Info Output in HTML
+        outStr = """<div style="height: 100px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;"><div class = orgForms><div style="display: flex; width: 20vw; height: auto; flex-direction: column; justify-content: center;"><h1 style="font-size: 24px;">User Information:</h1>"""
+        ind = ['User Id', 'Username', 'PassHash', '', 'Hours', 'Pending Hours', 'Status']
+        lis = data["userData"]
+        for i, item in enumerate(lis[0]):
+            if i == 3:
+                continue
+            else:
+                stri = f"<p style=\"font-size: 16px; margin-top:10px; margin-bottom: 0px;\"><b>{ind[i]}:</b><br>{item}</p>"
+                outStr = outStr + stri
+        outStr = outStr + """</div><div style="display: flex; width: 20vw; height: auto; flex-direction: column;"><h1 style="font-size:24px;">Organization Information:</h1>"""
+
+        ind = ['Org Name', 'Leader\'s Email', 'Total Verified Hours']
+        lis = data["orgData"]
+        for i, item in enumerate(lis[0]):
+            stri = f"<p style=\"font-size: 16px; margin-top:10px; margin-bottom: 0px;\"><b>{ind[i]}:</b><br>{item}</p>"
+            outStr = outStr + stri
+        outStr = outStr + """</div></div></div>"""
+
+    return render_template('index.html', panelUp='block', id=id, stat=stat, myHello=f"Information Fetched", killMe=outStr)
+
+@app.route('/approve')
+def approve_page():
+    entry_id = request.args.get('entry_id')
+
+    return f"""
+    <h1>Approve Volunteer Hours</h1>
+    <p>Entry ID: {entry_id}</p>
+
+    <form method="POST" action="/approve_submit">
+        <input type="hidden" name="entry_id" value="{entry_id}">
+        <button name="decision" value="Y">Approve</button>
+        <button name="decision" value="N">Reject</button>
+    </form>
+    """
+
+@app.route('/approve_submit', methods=['POST'])
+def approve_submit():
+    entry_id = request.form.get('entry_id')
+    decision = request.form.get('decision')
+
+    dataStr = json.dumps({
+        "action": "update",
+        "id": int(entry_id),
+        "ver": decision,
+        "status": "approved" if decision == "Y" else "N"
+    })
+
+    dataClient.send(dataStr.encode())
+    data = json.loads(dataClient.recv(4096).decode())
+
+    return f"<h2>Submission {decision}</h2>"
+
+@app.route('/logOut')
+def logout():
+    id = -1
+    stat = 0
+    con = True
+    usern = ""
+    return render_template('index.html', panelUp='none', id=id, stat=stat, con=con, myHello=f"Hello {usern}! How Can I Assist?")
+
+@app.route('/getMem')
+def listMembers():
+    global id
+    dataStr = json.dumps({
+        "action": "listm",
+        "id": id
+    })
+    dataClient.send(dataStr.encode())
+    data = json.loads(dataClient.recv(4096).decode())
+    memlist = """<div style="height: 100px; overflow-y: auto; border: 1px solid #ccc; padding: 10px;">"""
+    for object in data["data"]:
+        name, gid = object[0], object[1]
+        memlist = memlist + f"<p>{name} is in org with id {gid}</p>"
+    memlist = memlist + """</div>"""
+    return render_template('index.html', id=id, stat=stat, con=con, myHello=f"Hello {usern}! How Can I Assist?", myScroll=memlist, panelUp='block')
+
+@app.route('/changeEm')
+def updEmail():
+    nEmail = request.args.get("em")
+    global id
+    if nEmail:
+        dataStr = json.dumps({
+            "action": "updE",
+            "id": id,
+            "email": nEmail
+        })
+        dataClient.send(dataStr.encode())
+        data = json.loads(dataClient.recv(4096).decode())
+        print(data)
+    return render_template('index.html', id=id, stat=stat, con=con, myHello=f"Hello {usern}! How Can I Assist?", panelUp='block')
+
+@app.route('/promoteUsr')
+def updUser():
+    nLead = request.args.get("promId")
+    print(nLead)
+    if nLead:
+        global id
+        dataStr = json.dumps({
+            "action": "updU",
+            "id": id,
+            "Uid": nLead
+        })
+        dataClient.send(dataStr.encode())
+        data = json.loads(dataClient.recv(4096).decode())
+        print(data)
+    return render_template('index.html', id=id, stat=stat, con=con, myHello=f"Hello {usern}! How Can I Assist?", panelUp='block')
+
+@app.route('/sUsr')
+def storeU():
+    global id
+    sId = request.args['uId']
+
+    val = request.args['hour']
+    #Verify That Request is A Number
+    digits = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+    for c in list(val):
+        if c not in digits:
+            return render_template('index.html', myErr='Please Enter a Number', panelUp='none', id=id, stat=stat, myHello=f"Hello {usern}! How Can I Assist?")
+    #Clear Leading Zeros
+    val = val.lstrip('0')
+    
+    dataStr = f"{{\"action\": \"storeU\", \"hours\": {val}, \"Uid\": {sId}, \"id\": {id}}}"
+    print(dataStr)
+    #Pass Integer Hour Submission to Database Handler
+    dataClient.send(dataStr.encode('utf-8'))
+    data = json.loads(dataClient.recv(4096).decode())
+    print(data)
+    return render_template('index.html', id=id, stat=stat, con=con, myHello=f"Hello {usern}! How Can I Assist?", panelUp='block')
 
 
 if __name__ == "__main__":
