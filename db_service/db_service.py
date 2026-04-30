@@ -35,7 +35,8 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS entries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user TEXT,
-    hours INTEGER NOT NULL
+    hours INTEGER NOT NULL,
+    status TEXT DEFAULT 'pending'
 )
 """)
 cursor.execute("""
@@ -83,6 +84,18 @@ def handle_client(con):
                 )
                 conn.commit()
                 send_json(con, {"status": "leader"})
+        elif request["action"] == "listm":
+            cursor.execute(
+                "SELECT organization FROM people WHERE id=?", (request["id"],)
+            )
+            org = cursor.fetchone()
+            if org:
+                cursor.execute(
+                    "SELECT user, id FROM people WHERE organization=?", (org[0],)
+                )
+                rows = cursor.fetchall()
+                if rows:
+                    send_json(con, {"data": rows})
 
         elif request["action"] == "store":
             #Pass Email and Specefic id To Email Service
@@ -102,7 +115,11 @@ def handle_client(con):
                 #Email Organization Leader
                 cursor.execute("SELECT supervisor_email FROM organizations WHERE organization=?", (org[0],))
                 email = cursor.fetchone()[0]
-                #send_json(emCon, {"email": email, "id": id})
+                emCon = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                emCon.connect(("email_service", 5002))
+
+                send_json(emCon, {"email": email, "id": id})
+                emCon.close()
                 send_json(con, {"status": "stored"})
 
                 #Add To Pending Hours
@@ -115,23 +132,142 @@ def handle_client(con):
         elif request["action"] == "get":
             cursor.execute("SELECT * FROM people WHERE id=?", (request["id"],))
             rows = cursor.fetchall()
-            cursor.execute("SELECT * FROM organizations WHERE organization=?", (rows[0][3],))
-            rows2 = cursor.fetchall()
             if rows:
-                send_json(con, {"userData": rows, "orgData": rows2})
+                cursor.execute("SELECT * FROM organizations WHERE organization=?", (rows[0][3],))
+                rows2 = cursor.fetchall()
+                if rows2:
+                    send_json(con, {"userData": rows, "orgData": rows2})
             else:
                 send_json(con, {"err": "noSuchMember"})
 
-        #Email Confirmation Goes Through
-        elif request["action"] == "update":
-            if request["ver"] == "Y":
-                #I'm Gonna Change This All
+        elif request["action"] == "updE":
+            cursor.execute(
+                "SELECT organization FROM people WHERE id=?", (request["id"],)
+            )
+            org = cursor.fetchone()
+            if org:
                 cursor.execute(
-                    "UPDATE entries SET status=? WHERE id=?",
-                    (request["status"], request["id"])
+                    "UPDATE organizations SET supervisor_email=? WHERE organization=?", (request["email"], org[0])
                 )
                 conn.commit()
-                send_json(con, {"status": "updated"})
+                #Send Success
+                send_json(con, {"status": "complete"})
+
+        elif request["action"] == "updU":
+            cursor.execute(
+                "SELECT organization FROM people WHERE id=?", (request["id"],)
+            )
+            org1 = cursor.fetchone()
+            if org1:
+                cursor.execute(
+                    "SELECT organization FROM people WHERE id=?", (request["Uid"],)
+                )
+                org2 = cursor.fetchone()
+                if org2 and org1[0] == org2[0]:
+                    cursor.execute(
+                        """UPDATE people SET status="leader" WHERE id=?""", (request["Uid"],)
+                    )
+                    conn.commit()
+                    #Send Success
+                    send_json(con, {"status": "complete"})
+
+        elif request["action"] == "storeU":
+            cursor.execute(
+                "SELECT organization FROM people WHERE id=?", (request["id"],)
+            )
+            org1 = cursor.fetchone()
+            if org1:
+                cursor.execute(
+                    "SELECT organization FROM people WHERE id=?", (request["Uid"],)
+                )
+                org2 = cursor.fetchone()
+                if org2 and org1[0] == org2[0]:
+                    #Pass Email and Specefic id To Email Service
+                    cursor.execute(
+                        "SELECT organization, pending, user FROM people WHERE id=?", (request["Uid"],)
+                    )
+                    org = cursor.fetchone()
+                    if org:
+                        #Add to Entries
+                        cursor.execute(
+                            "INSERT INTO entries (user, hours) VALUES (?, ?) RETURNING id",
+                            (org[2], request["hours"])
+                        )
+                        id = cursor.fetchone()[0]
+                        conn.commit()
+
+                        #Email Organization Leader
+                        cursor.execute("SELECT supervisor_email FROM organizations WHERE organization=?", (org[0],))
+                        email = cursor.fetchone()[0]
+                        emCon = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        emCon.connect(("email_service", 5002))
+
+                        send_json(emCon, {"email": email, "id": id})
+                        emCon.close()
+                        print("Fuck")
+                        send_json(con, {"status": "stored"})
+
+                        #Add To Pending Hours
+                        totPend = request["hours"] + org[1]
+                        cursor.execute("UPDATE people SET pending=? WHERE id=?", (totPend, request["Uid"]))
+                        conn.commit()
+                        return
+            print("shit")
+            send_json(con, {"err": "nOrg"})
+
+        #Email Confirmation Goes Through
+        elif request["action"] == "update":
+            cursor.execute(
+                "SELECT id, user, hours FROM entries WHERE id=?",
+                (request.get("id"),)
+            )
+            ent = cursor.fetchone()
+
+            cursor.execute(
+                "SELECT user, hours, pending, organization FROM people WHERE user=?",
+                (ent[1],)
+            )
+            userData = cursor.fetchone()
+
+            if request["ver"] == "Y":
+                newTotal = userData[1] + ent[2]
+                newPending = userData[2] - ent[2]
+
+                cursor.execute(
+                    "UPDATE people SET hours=?, pending=? WHERE user=?",
+                    (newTotal, newPending, ent[1])
+                )
+
+                cursor.execute(
+                    "SELECT tot_hours FROM organizations WHERE organization=?",
+                    (userData[3],)
+                )
+                orgData = cursor.fetchone()
+                newOrgTotal = orgData[0] + ent[2]
+
+                cursor.execute(
+                    "UPDATE organizations SET tot_hours=? WHERE organization=?",
+                    (newOrgTotal, userData[3])
+                )
+
+                cursor.execute(
+                    "DELETE FROM entries WHERE id=?",
+                    (request.get("id"),)
+                )
+                conn.commit()
+            else:
+                newPending = userData[2] - ent[2]
+
+                cursor.execute(
+                    "UPDATE people SET pending=? WHERE user=?",
+                    (newPending, ent[1])
+                )
+
+                cursor.execute(
+                    "DELETE FROM entries WHERE id=?",
+                    (request.get("id"),)
+                )
+                conn.commit()
 
         elif request["action"] == "log" or request["action"] == "sign":
             if request["action"] == "sign":
