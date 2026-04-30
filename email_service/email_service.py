@@ -10,8 +10,8 @@ UI_BASE_URL = "http://localhost:5000/approve"
 
 SMTP_SERVER = "smtp.gmail.com"
 SMTP_PORT = 587
-SMTP_USER = "jlsanders2006@gmail.com"
-SMTP_PASS = "mphj cnis ttie goey"
+SMTP_USER = "Your_Email.com"
+SMTP_PASS = "APP_Password"
 
 
 def send_email(to_email, entry_id):
